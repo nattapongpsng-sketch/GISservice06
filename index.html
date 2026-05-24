@@ -491,15 +491,19 @@ function drawSwitches(){
     pointToLayer:(f,latlng)=>{
 
       const p = f.properties || {};
-      const tag = String(p.TAG || p.FACILITYID || '').toUpperCase();
+      const deviceText = getDeviceText(p);
 
-      if(tag.includes('WF')){
+      /* ===== DF / FUSE: WF หรือ F เช่น QSA02WF-111, QSA02F-111 ===== */
+
+      if(isFuseTag(deviceText)){
 
         return L.marker(latlng,{
           icon: makeFuseIcon()
         });
 
       }
+
+      /* ===== SWITCH ปกติ ===== */
 
       return L.circleMarker(latlng,{
         radius:5,
@@ -514,20 +518,19 @@ function drawSwitches(){
     onEachFeature:(f,l)=>{
 
       const p = f.properties || {};
-      const tag = String(p.TAG || p.FACILITYID || '').toUpperCase();
+      const deviceText = getDeviceText(p);
 
       l.on('click',()=>{
 
-        const latlng =
-          l.getLatLng
-            ? l.getLatLng()
-            : l.getLatLng();
+        const latlng = l.getLatLng();
 
         selectDevice(f, latlng);
 
       });
 
-      if(tag.includes('WF')){
+      /* ===== LABEL เฉพาะ DF / FUSE ===== */
+
+      if(isFuseTag(deviceText)){
 
         l.bindTooltip(
           p.FACILITYID || p.TAG || '',
@@ -561,34 +564,104 @@ function drawSwitches(){
 
   updateFuseIconByZoom();
 
+  map.off('zoomend', updateFuseIconByZoom);
   map.on('zoomend', updateFuseIconByZoom);
 
 }
+
+/* ===== รวมข้อความรหัสอุปกรณ์จากหลาย field ===== */
+
+function getDeviceText(p){
+
+  return String(
+    `${p.TAG || ''} ${p.FACILITYID || ''} ${p.FEEDERID || ''}`
+  )
+    .toUpperCase()
+    .trim();
+
+}
+
+/* ===== ตรวจว่าเป็น DF / Fuse หรือไม่ ===== */
+
+function isFuseTag(text){
+
+  const s = String(text || '').toUpperCase();
+
+  /*
+    รองรับ:
+    QSA02WF-111
+    QSA02F-111
+    ABCWF-001
+    ABCF-001
+  */
+
+  return (
+    /[A-Z]{2,}\d{2}WF[-_]/.test(s)
+    ||
+    /[A-Z]{2,}\d{2}F[-_]/.test(s)
+    ||
+    /\bWF[-_]/.test(s)
+    ||
+    /\bF[-_]/.test(s)
+  );
+
+}
+
+/* ===== สร้าง Icon DF/Fuse ===== */
 
 function makeFuseIcon(){
 
   const zoom = map.getZoom();
 
-  let size = 14;
+  let size = 10;
 
   if(zoom >= 18){
+
     size = 24;
+
   }else if(zoom >= 16){
-    size = 20;
+
+    size = 18;
+
   }else if(zoom >= 14){
-    size = 16;
-  }else{
+
     size = 12;
+
+  }else{
+
+    size = 8;
+
   }
 
   return L.divIcon({
+
     className:'wf-icon',
-    html:`<div class="wf-circle" style="width:${size}px;height:${size}px;font-size:${Math.max(9,size-8)}px;">F</div>`,
+
+    html:`
+      <div
+        class="wf-circle"
+        style="
+          width:${size}px;
+          height:${size}px;
+          font-size:${Math.max(7,size-7)}px;
+        "
+      >
+        F
+      </div>
+    `,
+
     iconSize:[size,size],
-    iconAnchor:[size/2,size/2]
+
+    iconAnchor:[
+      size/2,
+      size/2
+    ]
+
   });
 
 }
+
+/* ===== ปรับขนาด Icon และ Label ตาม Zoom ===== */
 
 function updateFuseIconByZoom(){
 
@@ -602,14 +675,21 @@ function updateFuseIconByZoom(){
 
     layer.setIcon(makeFuseIcon());
 
-    const tooltip = layer.getTooltip && layer.getTooltip();
+    const tooltip =
+      layer.getTooltip &&
+      layer.getTooltip();
 
     if(!tooltip) return;
 
-    const el = tooltip.getElement && tooltip.getElement();
+    const el =
+      tooltip.getElement &&
+      tooltip.getElement();
 
     if(el){
-      el.style.display = zoom >= 16 ? 'block' : 'none';
+      el.style.display =
+        zoom >= 14
+          ? 'block'
+          : 'none';
     }
 
   });
